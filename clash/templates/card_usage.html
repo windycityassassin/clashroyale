@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Usage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Card Usage</h1>
+    {% if error %}
+        <p class="error">Error: {{ error }}</p>
+    {% elif data %}
+        <ul>
+        {% for card, stats in data.items() %}
+            <li>{{ card }}: {{ stats.usage_rate|round(2) }}% (Count: {{ stats.count }})</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No card usage data available.</p>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Battle Replay Analysis{% endblock %}
+
+{% block content %}
+<h1>Battle Replay Analysis</h1>
+<form id="player-form">
+    <input type="text" id="player-tag" placeholder="Enter player tag" required>
+    <button type="submit">Analyze</button>
+</form>
+<div id="battle-analysis"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/battle_replay.js') }}"></script>
+{% endblock %}

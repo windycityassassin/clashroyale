@@ -1,0 +1,13 @@
+/* Add your custom styles here */
+body {
+    font-family: Arial, sans-serif;
+}
+.battle {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.error {
+    color: red;
+}
