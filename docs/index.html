@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clashroyale · Top-200 deck and battle analytics</title>
+<meta name="description" content="clashroyale — a Flask app that aggregates deck composition and battle outcomes for the top 200 globally-ranked Clash Royale players via the official Supercell API. Personal project by Arjun Prithvi.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a; --bg-soft: #141414; --bg-softer: #1a1a1a;
+    --border: #1f1f1f; --border-hot: #2a2a2a;
+    --text: #e8e8e8; --text-dim: #888; --text-faint: #555;
+    --accent: #0DFF82; --accent-warm: #FF2947;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 64px 24px 96px; }
+  header { margin-bottom: 56px; }
+  .crumb { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 16px; }
+  .crumb a { color: var(--text-dim); text-decoration: none; border-bottom: 1px solid var(--border); }
+  .crumb a:hover { color: var(--text); }
+  h1 { font-size: 44px; font-weight: 700; letter-spacing: -1.5px; margin-bottom: 8px; }
+  h1 .accent { color: var(--accent); }
+  .tagline { font-size: 18px; color: var(--text-dim); max-width: 640px; margin-bottom: 28px; }
+  .header-links { display: flex; gap: 18px; flex-wrap: wrap; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+  .header-links a { color: var(--text-dim); text-decoration: none; border-bottom: 1px solid var(--border); padding-bottom: 2px; transition: color 0.15s, border-color 0.15s; }
+  .header-links a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  section { margin-bottom: 56px; }
+  .section-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 16px; }
+  h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 14px; }
+  p { color: var(--text); margin-bottom: 12px; }
+  p.note { color: var(--text-dim); font-size: 14px; }
+  code, kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; background: var(--bg-soft); color: var(--text); padding: 1px 6px; border-radius: 3px; font-size: 13.5px; border: 1px solid var(--border); }
+
+  .pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .step { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; }
+  .step-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: var(--accent); letter-spacing: 1.5px; margin-bottom: 6px; }
+  .step-name { font-weight: 700; margin-bottom: 6px; font-size: 15px; }
+  .step-desc { color: var(--text-dim); font-size: 13.5px; line-height: 1.55; }
+
+  pre { background: #06060c; border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; line-height: 1.6; color: rgba(232, 232, 232, 0.9); }
+  pre .comment { color: var(--text-faint); }
+  pre .ok { color: var(--accent); }
+  pre .ts { color: var(--text-faint); }
+  pre .str { color: #d4b66a; }
+
+  .ui-mock {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-hot);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .ui-bar {
+    background: #0e0e0e;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    gap: 18px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .ui-bar .tab { padding: 4px 0; }
+  .ui-bar .tab.active { color: var(--accent); border-bottom: 1px solid var(--accent); }
+  .ui-body { padding: 22px; }
+  .ui-row {
+    display: grid;
+    grid-template-columns: 28ch 1fr 6ch;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #161616;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+  }
+  .ui-row:last-child { border-bottom: 0; }
+  .ui-row .name { color: var(--text); }
+  .ui-row .bar { background: #0a0a0a; height: 10px; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); }
+  .ui-row .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), rgba(13,255,130,0.3)); }
+  .ui-row .pct { color: var(--text-dim); text-align: right; font-size: 12px; }
+  .mock-note {
+    padding: 12px 16px;
+    background: #0a0a0a;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.5px;
+  }
+
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stack span { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 4px; padding: 6px 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--text-dim); }
+  .stack span b { color: var(--text); font-weight: 600; }
+
+  .badge { display: inline-block; background: transparent; color: var(--text-faint); border: 1px solid var(--border-hot); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; padding: 2px 8px; border-radius: 3px; margin-left: 12px; vertical-align: middle; }
+
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--text-faint); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  footer a { color: var(--text-faint); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 40px 18px 64px; }
+    h1 { font-size: 32px; }
+    .pipeline { grid-template-columns: 1fr; }
+    .ui-row { grid-template-columns: 18ch 1fr 5ch; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="crumb">
+    <a href="https://windycityassassin.github.io/">arjunprithvi</a> /
+    <span>clashroyale</span>
+  </div>
+  <h1>clashroyale <span class="accent">·</span> Top-200 deck analytics<span class="badge">TOUR MODE</span></h1>
+  <p class="tagline">A small Flask app that asks the official Supercell API a simple question: out of the 200 highest-ranked Clash Royale players globally right now, which cards are everyone running, and how do their decks fare in the last few battles? Two pages, no AI, no scraping — just rate-limited calls and aggregation.</p>
+  <div class="header-links">
+    <a href="https://github.com/windycityassassin/clashroyale" target="_blank" rel="noopener">code →</a>
+    <a href="https://developer.clashroyale.com/" target="_blank" rel="noopener">Supercell API →</a>
+    <a href="https://windycityassassin.github.io/" target="_blank" rel="noopener">portfolio →</a>
+  </div>
+</header>
+
+<section>
+  <div class="section-label">Card-usage view, real output shape</div>
+  <p>The dashboard ranks each card by what percentage of the top-200 decks it appears in. Below is the UI layout — populated with the names and order from a typical meta snapshot. The percentages animate from zero to the snapshot values when the page would have hit the live API.</p>
+  <div class="ui-mock">
+    <div class="ui-bar">
+      <span class="tab active">/ card_usage</span>
+      <span class="tab">/ battle_replay</span>
+      <span class="tab" style="margin-left:auto;color:var(--text-faint);">top 200 · global · ladder</span>
+    </div>
+    <div class="ui-body">
+      <div class="ui-row"><span class="name">Hog Rider</span><span class="bar"><div style="width:42%"></div></span><span class="pct">42%</span></div>
+      <div class="ui-row"><span class="name">The Log</span><span class="bar"><div style="width:38%"></div></span><span class="pct">38%</span></div>
+      <div class="ui-row"><span class="name">Skeleton Army</span><span class="bar"><div style="width:31%"></div></span><span class="pct">31%</span></div>
+      <div class="ui-row"><span class="name">Fireball</span><span class="bar"><div style="width:29%"></div></span><span class="pct">29%</span></div>
+      <div class="ui-row"><span class="name">Mega Knight</span><span class="bar"><div style="width:27%"></div></span><span class="pct">27%</span></div>
+      <div class="ui-row"><span class="name">Goblin Barrel</span><span class="bar"><div style="width:24%"></div></span><span class="pct">24%</span></div>
+      <div class="ui-row"><span class="name">Knight</span><span class="bar"><div style="width:23%"></div></span><span class="pct">23%</span></div>
+      <div class="ui-row"><span class="name">Musketeer</span><span class="bar"><div style="width:21%"></div></span><span class="pct">21%</span></div>
+    </div>
+    <div class="mock-note">// UI layout. Real percentages come from a live API pull and vary with the season. Live hosting needs a Supercell key + IP-whitelisted backend.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Pipeline</div>
+  <div class="pipeline">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-name">rate-limited client</div>
+      <div class="step-desc"><code>utils/api_client.py</code> wraps the API with a 5 req/s budget. Every call sleeps to the next slot in the window. No bursts, no 429s in practice.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-name">fetch top 200</div>
+      <div class="step-desc"><code>GET /locations/global/rankings/players</code> returns the leaderboard. We keep the player tags only — everything else is requested per-player.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-name">per-player deck pull</div>
+      <div class="step-desc">200 sequential <code>GET /players/{tag}</code> calls, each returning the player's current deck of 8 cards. With the 5 req/s budget this takes ~40 seconds — the bottleneck.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-name">aggregate card usage</div>
+      <div class="step-desc"><code>card_analyzer.py</code> walks the 200 decks, increments a counter per card, divides by 200. Returns the list sorted by frequency descending.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-name">battle replay</div>
+      <div class="step-desc">For a single player tag the user enters, <code>GET /players/{tag}/battlelog</code> returns the last 25 battles. <code>battle_analyzer.py</code> extracts crowns, trophy delta, opponent deck, win/loss.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">06</div>
+      <div class="step-name">render</div>
+      <div class="step-desc">Flask hands the structured JSON to Jinja, which renders <code>card_usage.html</code> and <code>battle_replay.html</code>. No SPA, no framework, no state on the server beyond the API key.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Code shape</div>
+  <p class="note" style="margin-bottom:14px;">The whole rate-limited API wrapper is small enough to read in one screen.</p>
+  <pre><span class="comment"># clash/utils/api_client.py</span>
+class ClashRoyaleAPI:
+    BASE = <span class="str">"https://api.clashroyale.com/v1"</span>
+    RATE = 5  <span class="comment"># requests per second, ceiling enforced by Supercell</span>
+
+    def __init__(self, key):
+        self.h = {<span class="str">"Authorization"</span>: f<span class="str">"Bearer {key}"</span>}
+        self.last = 0
+
+    def _throttle(self):
+        gap = 1.0 / self.RATE
+        wait = gap - (time.time() - self.last)
+        if wait &gt; 0: time.sleep(wait)
+        self.last = time.time()
+
+    def get(self, path):
+        self._throttle()
+        url = f<span class="str">"{self.BASE}{path}"</span>
+        r = requests.get(url, headers=self.h, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def top_players(self, location=<span class="str">"global"</span>):
+        return self.get(f<span class="str">"/locations/{location}/rankings/players"</span>)[<span class="str">"items"</span>]
+
+    def player(self, tag):
+        return self.get(f<span class="str">"/players/%23{tag.lstrip('#')}"</span>)</pre>
+</section>
+
+<section>
+  <div class="section-label">Run it</div>
+  <pre><span class="comment"># 1. register an app at developer.clashroyale.com, get a key, whitelist your egress IP</span>
+<span class="comment"># 2. drop the key in .env</span>
+echo <span class="str">"CLASH_ROYALE_API_KEY=ey..."</span> &gt; .env
+
+git clone https://github.com/windycityassassin/clashroyale
+cd clashroyale/clash
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+flask --app app run --debug
+<span class="comment"># open http://localhost:5000/card_usage</span></pre>
+  <p class="note">The API key must be whitelisted to the IP the requests come from. For local dev that's your home IP; for any hosted version it's a fixed egress IP. This is why the live demo on this page is a UI layout rather than a real query — GitHub Pages has no backend, and a free PaaS would need its own whitelist entry.</p>
+</section>
+
+<section>
+  <div class="section-label">Stack</div>
+  <div class="stack">
+    <span><b>Flask</b> 2.0</span>
+    <span><b>requests</b> + bespoke throttle</span>
+    <span><b>Jinja2</b> templates</span>
+    <span><b>vanilla JS</b> for chart</span>
+    <span><b>Supercell API</b> · official</span>
+    <span><b>python-dotenv</b></span>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">What this is not</div>
+  <p>Not a deck builder. Not a matchmaking predictor. Not an ML project — there is no model anywhere in this repo. The point was to learn how a free-tier game API holds up under a real workload (200 sequential pulls, rate-limited) and to write the smallest possible analytics surface on top of it.</p>
+  <p>Not a substitute for RoyaleAPI / Stats Royale. Those services exist, do this at scale, and have IP-whitelisted infra. This repo is the proof-of-concept I built before deciding whether to graduate it into something hosted.</p>
+</section>
+
+<footer>
+  <div>clashroyale · Flask · Oct 2024</div>
+  <div><a href="https://github.com/windycityassassin/clashroyale" target="_blank" rel="noopener">github.com/windycityassassin/clashroyale</a></div>
+</footer>
+
+</div>
+</body>
+</html>
