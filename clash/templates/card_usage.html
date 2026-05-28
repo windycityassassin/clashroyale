@@ -1,23 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Usage</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <h1>Card Usage</h1>
-    {% if error %}
-        <p class="error">Error: {{ error }}</p>
-    {% elif data %}
-        <ul>
+{% extends "base.html" %}
+
+{% block title %}Card Usage &mdash; Top 200{% endblock %}
+
+{% block content %}
+<h1>Card Usage &mdash; Top 200 Global Ladder</h1>
+
+{% if error %}
+    <p class="error">Error: {{ error }}</p>
+{% elif data %}
+    <p>Showing pick rate of every card across the top-200 global ladder decks.</p>
+    <table class="usage-table">
+        <thead><tr><th>#</th><th>Card</th><th>Pick rate</th><th>Count</th><th></th></tr></thead>
+        <tbody>
+        {% set ns = namespace(top=0) %}
         {% for card, stats in data.items() %}
-            <li>{{ card }}: {{ stats.usage_rate|round(2) }}% (Count: {{ stats.count }})</li>
+            {% if loop.first %}{% set ns.top = stats.usage_rate %}{% endif %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ card }}</td>
+                <td>{{ stats.usage_rate|round(1) }}%</td>
+                <td>{{ stats.count }}</td>
+                <td>
+                    <div class="bar" style="width: {{ (stats.usage_rate / ns.top * 100)|round(1) }}%"></div>
+                </td>
+            </tr>
         {% endfor %}
-        </ul>
-    {% else %}
-        <p>No card usage data available.</p>
-    {% endif %}
-</body>
-</html>
+        </tbody>
+    </table>
+{% else %}
+    <p>No card usage data available.</p>
+{% endif %}
+{% endblock %}

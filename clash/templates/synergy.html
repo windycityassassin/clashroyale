@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Card Synergy{% endblock %}
+
+{% block content %}
+<h1>Card Synergy</h1>
+<p>Enter a card name exactly as it appears in-game (e.g. <code>Hog Rider</code>, <code>Mega Knight</code>, <code>Royal Giant</code>). Returns the seven cards top-200 ladder players most often run alongside it.</p>
+<p class="note">First request takes ~40s as it pulls all 200 decks. Cached after that for the life of the process.</p>
+
+<form id="synergy-form">
+    <input type="text" id="card-name" placeholder="Hog Rider" required>
+    <button type="submit">Find Partners</button>
+</form>
+
+<div id="synergy-result"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/synergy.js') }}"></script>
+{% endblock %}

@@ -1,13 +1,110 @@
-/* Add your custom styles here */
 body {
-    font-family: Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+    color: #222;
+    line-height: 1.4;
 }
+
+nav {
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+nav a {
+    margin-right: 16px;
+    text-decoration: none;
+    color: #06c;
+}
+nav a:hover { text-decoration: underline; }
+
+h1 { margin-top: 0; }
+.note { color: #666; font-size: 0.9em; }
+.error { color: #c00; }
+
+form input[type="text"] {
+    padding: 6px 10px;
+    font-size: 14px;
+    width: 220px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+form button {
+    padding: 6px 14px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
 .battle {
     border: 1px solid #ddd;
     padding: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+    border-radius: 4px;
 }
 
-.error {
-    color: red;
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 16px;
+}
+th, td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+th {
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.bar {
+    height: 10px;
+    background: #06c;
+    border-radius: 2px;
+    min-width: 1px;
+}
+
+.signals tr.fired {
+    background: #fff8e1;
+}
+.signals td:first-child {
+    text-align: center;
+    color: #c47a00;
+    font-weight: bold;
+}
+
+.verdict-ok   { color: #2a7; }
+.verdict-low  { color: #b80; }
+.verdict-mid  { color: #c50; }
+.verdict-high { color: #c00; }
+
+.bot-summary {
+    border: 1px solid #ddd;
+    padding: 12px 16px;
+    border-radius: 4px;
+    background: #fafafa;
+    margin-top: 16px;
+}
+.bot-summary h2 small {
+    font-weight: normal;
+    color: #888;
+    font-size: 0.7em;
+    margin-left: 8px;
+}
+
+.scan-table code,
+.usage-table code {
+    background: #f3f3f3;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 0.9em;
+}
+
+code {
+    background: #f3f3f3;
+    padding: 1px 4px;
+    border-radius: 2px;
 }

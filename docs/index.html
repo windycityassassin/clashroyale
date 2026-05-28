@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>clashroyale · Top-200 deck and battle analytics</title>
-<meta name="description" content="clashroyale — a Flask app that aggregates deck composition and battle outcomes for the top 200 globally-ranked Clash Royale players via the official Supercell API. Personal project by Arjun Prithvi.">
+<meta name="description" content="clashroyale — a Flask app over the Supercell API: ten-signal bot detection on opponent accounts, card synergy from the live top-200 meta, top-200 deck aggregation. Personal project by Arjun Prithvi.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -92,6 +92,27 @@
     letter-spacing: 0.5px;
   }
 
+  .verdict-row { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 14px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+  .verdict-row .who { color: var(--text); }
+  .verdict-row .who small { color: var(--text-dim); margin-left: 8px; }
+  .verdict-row .score { display: flex; align-items: center; gap: 10px; }
+  .verdict-row .score .num { color: var(--accent); font-size: 18px; font-weight: 700; }
+  .verdict-row .score .verdict-label { color: var(--accent); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .verdict-row.warm .score .num, .verdict-row.warm .score .verdict-label { color: var(--accent-warm); }
+  .sig-row { display: grid; grid-template-columns: 8ch 26ch 1fr; gap: 12px; padding: 5px 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; border-bottom: 1px solid #161616; align-items: baseline; }
+  .sig-row:last-child { border-bottom: 0; }
+  .sig-row .tag-fire { color: var(--accent-warm); font-weight: 700; }
+  .sig-row .tag-clean { color: var(--text-faint); }
+  .sig-row .sig-name { color: var(--text); }
+  .sig-row .sig-val { color: var(--text-dim); font-size: 12px; }
+
+  .syn-row { display: grid; grid-template-columns: 22ch 1fr 5ch; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid #161616; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+  .syn-row:last-child { border-bottom: 0; }
+  .syn-row .partner { color: var(--text); }
+  .syn-row .bar { background: #0a0a0a; height: 10px; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); }
+  .syn-row .bar > div { height: 100%; background: linear-gradient(90deg, #d4b66a, rgba(212,182,106,0.3)); }
+  .syn-row .pct { color: var(--text-dim); text-align: right; font-size: 12px; }
+
   .stack { display: flex; flex-wrap: wrap; gap: 8px; }
   .stack span { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 4px; padding: 6px 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--text-dim); }
   .stack span b { color: var(--text); font-weight: 600; }
@@ -118,8 +139,8 @@
     <a href="https://windycityassassin.github.io/">arjunprithvi</a> /
     <span>clashroyale</span>
   </div>
-  <h1>clashroyale <span class="accent">·</span> Top-200 deck analytics<span class="badge">TOUR MODE</span></h1>
-  <p class="tagline">A small Flask app that asks the official Supercell API a simple question: out of the 200 highest-ranked Clash Royale players globally right now, which cards are everyone running, and how do their decks fare in the last few battles? Two pages, no AI, no scraping — just rate-limited calls and aggregation.</p>
+  <h1>clashroyale <span class="accent">·</span> Bot detection + deck analytics<span class="badge">TOUR MODE</span></h1>
+  <p class="tagline">A small Flask app over the official Supercell API. Started as a top-200 deck aggregator; now also scores any opponent on ten transparent heuristics ("is this a bot or a human?") and surfaces card synergies from the live meta. The bot detector was the whole reason this project exists — I got pissed off losing to obvious scripts and wanted receipts.</p>
   <div class="header-links">
     <a href="https://github.com/windycityassassin/clashroyale" target="_blank" rel="noopener">code →</a>
     <a href="https://developer.clashroyale.com/" target="_blank" rel="noopener">Supercell API →</a>
@@ -147,6 +168,59 @@
       <div class="ui-row"><span class="name">Musketeer</span><span class="bar"><div style="width:21%"></div></span><span class="pct">21%</span></div>
     </div>
     <div class="mock-note">// UI layout. Real percentages come from a live API pull and vary with the season. Live hosting needs a Supercell key + IP-whitelisted backend.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Bot detector, real output</div>
+  <p>Pulls the opponent's profile and last 25 battles, runs ten transparent heuristics — clanless, auto-generated name, level/trophy mismatch, zero lifetime donations, no favourite card, fewer than 30 cards owned, no badge progress, ladder-only play, single-deck grind, 24/7 hours-of-day spread. Each signal carries a weight; the sum is the score. No ML, no opacity — every fired/clean state is shown so you can argue with the verdict.</p>
+  <div class="ui-mock">
+    <div class="ui-bar">
+      <span class="tab active">/ bot_check</span>
+      <span class="tab">/ recent_opponents</span>
+      <span class="tab">/ synergy</span>
+      <span class="tab" style="margin-left:auto;color:var(--text-faint);">live API output</span>
+    </div>
+    <div class="ui-body">
+      <div class="verdict-row">
+        <div class="who">Matteo <small>#VRPGYPPYP · lvl 38 · 8268 trophies</small></div>
+        <div class="score"><span class="num">20</span><span class="verdict-label">unlikely bot</span></div>
+      </div>
+      <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">clanless</span><span class="sig-val">+10 · not in a clan</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">auto_generated_name</span><span class="sig-val">"Matteo" — real-name pattern</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">level_trophy_mismatch</span><span class="sig-val">level 38 ↔ 8268 trophies, internally consistent</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">zero_total_donations</span><span class="sig-val">17,412 lifetime donations</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_favourite_card</span><span class="sig-val">Valkyrie</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">few_cards_owned</span><span class="sig-val">40 cards</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_badge_progress</span><span class="sig-val">17 badges</span></div>
+      <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">ladder_only</span><span class="sig-val">+10 · all recent battles are PvP ladder</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">single_deck_grind</span><span class="sig-val">insufficient sample (battlelog has 2)</span></div>
+      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">round_the_clock_play</span><span class="sig-val">insufficient sample (need ≥10 timestamped battles)</span></div>
+    </div>
+    <div class="mock-note">// Real scan against an actual opponent from my last match. Score 0-24 = unlikely bot, 25-49 = suspicious, 50-74 = likely, 75+ = very likely.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Card synergy view</div>
+  <p>For any card, pulls every top-200 deck containing it and ranks the seven cards it co-occurs with most often. Surfaces archetypes from the live meta without hardcoding a single "this is a cycle deck" rule. The bars below show the partners pulled alongside Hog Rider in a recent snapshot.</p>
+  <div class="ui-mock">
+    <div class="ui-bar">
+      <span class="tab">/ bot_check</span>
+      <span class="tab">/ recent_opponents</span>
+      <span class="tab active">/ synergy</span>
+      <span class="tab" style="margin-left:auto;color:var(--text-faint);">card: Hog Rider · top 200 · global</span>
+    </div>
+    <div class="ui-body">
+      <div class="syn-row"><span class="partner">Musketeer</span><span class="bar"><div style="width:78%"></div></span><span class="pct">78%</span></div>
+      <div class="syn-row"><span class="partner">Ice Spirit</span><span class="bar"><div style="width:71%"></div></span><span class="pct">71%</span></div>
+      <div class="syn-row"><span class="partner">Cannon</span><span class="bar"><div style="width:64%"></div></span><span class="pct">64%</span></div>
+      <div class="syn-row"><span class="partner">Skeletons</span><span class="bar"><div style="width:58%"></div></span><span class="pct">58%</span></div>
+      <div class="syn-row"><span class="partner">The Log</span><span class="bar"><div style="width:55%"></div></span><span class="pct">55%</span></div>
+      <div class="syn-row"><span class="partner">Fireball</span><span class="bar"><div style="width:49%"></div></span><span class="pct">49%</span></div>
+      <div class="syn-row"><span class="partner">Ice Golem</span><span class="bar"><div style="width:41%"></div></span><span class="pct">41%</span></div>
+    </div>
+    <div class="mock-note">// UI layout. Real co-occurrence rates come from a live top-200 sweep and shift between seasons.</div>
   </div>
 </section>
 
@@ -180,8 +254,23 @@
     </div>
     <div class="step">
       <div class="step-num">06</div>
+      <div class="step-name">bot detector</div>
+      <div class="step-desc"><code>bot_detector.py</code> runs ten weighted signals against a profile + battlelog. Returns score, verdict, and each signal's fired/clean state. Anti-mystery: no model, no opacity.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">07</div>
+      <div class="step-name">opponent sweep</div>
+      <div class="step-desc"><code>RecentOpponentScanner</code> walks your last 25 battles, dedupes opponent tags, scores each. ~50 API calls at 5 req/s ≈ 10s. Sorted by suspicion, descending.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">08</div>
+      <div class="step-name">card synergy</div>
+      <div class="step-desc"><code>synergy.py</code> builds a co-occurrence count from top-200 decks. For any card, returns the seven cards most often slotted alongside it. Cached per sweep.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">09</div>
       <div class="step-name">render</div>
-      <div class="step-desc">Flask hands the structured JSON to Jinja, which renders <code>card_usage.html</code> and <code>battle_replay.html</code>. No SPA, no framework, no state on the server beyond the API key.</div>
+      <div class="step-desc">Flask hands the structured JSON to Jinja, which renders five views. No SPA, no framework, no state on the server beyond the API key.</div>
     </div>
   </div>
 </section>
@@ -236,23 +325,25 @@ flask --app app run --debug
 <section>
   <div class="section-label">Stack</div>
   <div class="stack">
-    <span><b>Flask</b> 2.0</span>
-    <span><b>requests</b> + bespoke throttle</span>
+    <span><b>Flask</b> 2.0 · Werkzeug 2.0.3 pin</span>
+    <span><b>requests</b> + bespoke 5 req/s throttle</span>
     <span><b>Jinja2</b> templates</span>
-    <span><b>vanilla JS</b> for chart</span>
+    <span><b>vanilla JS</b> for chart + forms</span>
     <span><b>Supercell API</b> · official</span>
     <span><b>python-dotenv</b></span>
+    <span><b>no ML</b> · ten transparent heuristics</span>
   </div>
 </section>
 
 <section>
   <div class="section-label">What this is not</div>
-  <p>Not a deck builder. Not a matchmaking predictor. Not an ML project — there is no model anywhere in this repo. The point was to learn how a free-tier game API holds up under a real workload (200 sequential pulls, rate-limited) and to write the smallest possible analytics surface on top of it.</p>
+  <p>Not a deck builder. Not a matchmaking predictor. Not an ML project — there is no model anywhere in this repo. The bot detector is ten weighted heuristics, each readable in two lines. The point was to learn how a free-tier game API holds up under a real workload (200 sequential pulls, rate-limited) and to write the smallest possible analytics surface on top of it.</p>
+  <p>Not a Supercell ToS violation. The bot detector is a "make a judgment call I'd make manually anyway" tool — it reads only public profile fields and your own battlelog. It does not auto-report, scrape between accounts, or touch any endpoint outside the official rate budget.</p>
   <p>Not a substitute for RoyaleAPI / Stats Royale. Those services exist, do this at scale, and have IP-whitelisted infra. This repo is the proof-of-concept I built before deciding whether to graduate it into something hosted.</p>
 </section>
 
 <footer>
-  <div>clashroyale · Flask · Oct 2024</div>
+  <div>clashroyale · Flask · Oct 2024 · bot detector + synergy May 2026</div>
   <div><a href="https://github.com/windycityassassin/clashroyale" target="_blank" rel="noopener">github.com/windycityassassin/clashroyale</a></div>
 </footer>
 

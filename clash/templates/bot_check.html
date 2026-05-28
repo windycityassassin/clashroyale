@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Bot Check{% endblock %}
+
+{% block content %}
+<h1>Bot Check</h1>
+<p>Enter any player tag (with or without the leading <code>#</code>). Returns a 0-100 bot-likelihood score and the signals that fired.</p>
+
+<form id="bot-form">
+    <input type="text" id="player-tag" placeholder="#2P0LYQ" value="{{ default_tag or '' }}" required>
+    <button type="submit">Score</button>
+</form>
+
+<div id="bot-result"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/bot_check.js') }}"></script>
+{% endblock %}

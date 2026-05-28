@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Welcome to Clash Royale Analyzer</h1>
-<p>Choose an analysis tool from the navigation menu.</p>
+<h1>Clash Royale Analyzer</h1>
+<p>Pick a tool:</p>
+<ul>
+    <li><a href="{{ url_for('bot_check') }}">Bot Check</a> &mdash; score a single player tag on bot-likelihood heuristics.</li>
+    <li><a href="{{ url_for('recent_opponents') }}">Recent Opponents</a> &mdash; pull your last 25 battles and bot-score every opponent.</li>
+    <li><a href="{{ url_for('card_usage') }}">Card Usage</a> &mdash; pick rate across the top-200 global ladder.</li>
+    <li><a href="{{ url_for('synergy') }}">Card Synergy</a> &mdash; cards most often paired with a given card in top-200 decks.</li>
+    <li><a href="{{ url_for('battle_replay') }}">Battle Replay</a> &mdash; per-battle breakdown for a player tag.</li>
+</ul>
+<p class="note">All data via the official Supercell API. Bot scoring is heuristic, not authoritative; treat verdicts as evidence to look at, not as proof.</p>
 {% endblock %}

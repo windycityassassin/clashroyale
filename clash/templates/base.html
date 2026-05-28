@@ -12,8 +12,11 @@
         <a href="{{ url_for('index') }}">Home</a>
         <a href="{{ url_for('card_usage') }}">Card Usage</a>
         <a href="{{ url_for('battle_replay') }}">Battle Replay</a>
+        <a href="{{ url_for('bot_check') }}">Bot Check</a>
+        <a href="{{ url_for('recent_opponents') }}">Recent Opponents</a>
+        <a href="{{ url_for('synergy') }}">Card Synergy</a>
     </nav>
-    
+
     <main>
         {% block content %}{% endblock %}
     </main>

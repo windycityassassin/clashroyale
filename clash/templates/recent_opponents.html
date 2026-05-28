@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Recent Opponents{% endblock %}
+
+{% block content %}
+<h1>Recent Opponents Bot Scan</h1>
+<p>Enter <em>your</em> player tag. Pulls your last 25 battles, runs the bot detector on every opponent, sorts by score descending.</p>
+<p class="note">This issues ~50 API calls (2 per opponent) at 5 req/s, so expect ~10 seconds.</p>
+
+<form id="scan-form">
+    <input type="text" id="player-tag" placeholder="#YOURTAG" value="{{ default_tag or '' }}" required>
+    <button type="submit">Scan</button>
+</form>
+
+<div id="scan-result"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/recent_opponents.js') }}"></script>
+{% endblock %}

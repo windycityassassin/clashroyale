@@ -1,15 +1,22 @@
 # clashroyale
 
-A small Flask app that aggregates deck composition and battle outcomes for the top 200 globally-ranked Clash Royale players via the official Supercell API. Two pages, no AI, no scraping — just rate-limited calls and aggregation.
+A small Flask app over the official Supercell API. Aggregates top-200 ladder data and exposes a transparent, heuristic bot-likelihood scorer for any player tag. No AI, no scraping, no auto-submission, no Easy Apply.
 
 **Live tour:** [windycityassassin.github.io/clashroyale/](https://windycityassassin.github.io/clashroyale/)
 
 ## What it does
 
-- **`/card_usage`** — fetches the top-200 global ladder, pulls each player's current 8-card deck, aggregates usage frequency, ranks cards by % appearance.
+- **`/bot_check`** — score one player tag 0-100 on bot-likelihood. Returns every signal that fired (clanless, auto-name, level-trophy mismatch, zero donations, single-deck grind, round-the-clock play, etc.) with its weight and the underlying value. Verdict bucket: unlikely / suspicious / likely / very likely.
+- **`/recent_opponents`** — give it *your* tag, it pulls your last 25 battles, runs the bot scorer on every unique opponent, sorts by score. ~50 API calls, ~10s.
+- **`/card_usage`** — fetches the top-200 global ladder, pulls each player's current 8-card deck, aggregates usage frequency, ranks cards by % appearance. Renders a real bar table now (was a TODO stub).
+- **`/synergy`** — pick a card, returns the 7 cards most often co-occurring with it in top-200 decks, with co-occurrence count and pair rate.
 - **`/battle_replay`** — given a player tag, pulls the last 25 battles, extracts crowns, trophy delta, opponent deck, win/loss.
 
-Pipeline is rate-limited to 5 req/s by `utils/api_client.py` (the Supercell ceiling). A top-200 sweep takes ~40 seconds.
+Pipeline is rate-limited to 5 req/s by `utils/api_client.py` (the Supercell ceiling). A top-200 sweep takes ~40 seconds; subsequent synergy queries are cached for the life of the process.
+
+## On the bot detector
+
+There is no ground truth in the Supercell API. Every signal in `utils/bot_detector.py` is a heuristic. Weights are rough. The output exposes each signal so you can argue with the verdict instead of trusting a black box. False positives on smurfs and sold accounts are expected.
 
 ## Run it
 
@@ -34,7 +41,7 @@ Flask 2.0 · requests + bespoke throttle · Jinja2 · vanilla JS · python-doten
 
 ## Status
 
-Personal project, Oct 2024. Card-usage view is fully wired. Battle-replay view is fully wired. The `card_usage.js` chart-rendering layer is a TODO stub — the underlying `/api/card_usage` endpoint returns the data, but the front-end currently logs to console rather than rendering a chart.
+Personal project, Oct 2024, expanded May 2026 with the bot detector, recent-opponent scan, and card synergy views. All five pages wired and smoke-tested in-process. Live use requires a Supercell developer key with your egress IP whitelisted.
 
 ## Not
 
