@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>clashroyale · Top-200 deck and battle analytics</title>
+<title>clashroyale · Bot detection + deck analytics over the Supercell API</title>
 <meta name="description" content="clashroyale — a Flask app over the Supercell API: ten-signal bot detection on opponent accounts, card synergy from the live top-200 meta, top-200 deck aggregation. Personal project by Arjun Prithvi.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -64,8 +64,57 @@
     font-size: 12px;
     color: var(--text-dim);
   }
-  .ui-bar .tab { padding: 4px 0; }
+  .ui-bar .tab { padding: 4px 0; cursor: pointer; transition: color 0.15s; user-select: none; }
+  .ui-bar .tab:hover { color: var(--text); }
   .ui-bar .tab.active { color: var(--accent); border-bottom: 1px solid var(--accent); }
+  .ui-bar .tab.static { cursor: default; }
+  .ui-bar .tab.static:hover { color: var(--text-dim); }
+  .view { display: none; }
+  .view.show { display: block; animation: fadein 0.18s ease-out; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+  .ui-row .bar > div, .syn-row .bar > div { transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+
+  /* recent_opponents table */
+  .opp-row { display: grid; grid-template-columns: 12ch 16ch 5ch 7ch 1fr 5ch; gap: 12px; padding: 7px 0; border-bottom: 1px solid #161616; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; align-items: center; }
+  .opp-row.head { color: var(--text-faint); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid var(--border-hot); padding-bottom: 9px; }
+  .opp-row .tag { color: var(--text-dim); }
+  .opp-row .name { color: var(--text); }
+  .opp-row .num { color: var(--text-dim); text-align: right; }
+  .opp-row .res-win { color: var(--accent); }
+  .opp-row .res-loss { color: var(--accent-warm); }
+  .opp-row .verdict-cell { display: flex; align-items: center; gap: 8px; }
+  .opp-row .vbar { background: #0a0a0a; height: 6px; flex: 1; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); }
+  .opp-row .vbar > div { height: 100%; transition: width 0.5s; }
+  .opp-row .vbar > div.v-low { background: linear-gradient(90deg, var(--accent), rgba(13,255,130,0.3)); }
+  .opp-row .vbar > div.v-mid { background: linear-gradient(90deg, #d4b66a, rgba(212,182,106,0.3)); }
+  .opp-row .vbar > div.v-hi { background: linear-gradient(90deg, var(--accent-warm), rgba(255,41,71,0.3)); }
+  .opp-row .vscore { color: var(--text); font-weight: 700; }
+  .opp-row.sample { opacity: 0.78; }
+  .opp-row.sample .name::after { content: " ·sample"; color: var(--text-faint); font-size: 10px; }
+
+  /* Try-it widget */
+  .try-it { background: var(--bg-soft); border: 1px solid var(--border-hot); border-radius: 8px; padding: 22px 22px 18px; }
+  .try-grid { display: grid; grid-template-columns: 1fr 260px; gap: 28px; align-items: start; }
+  @media (max-width: 720px) { .try-grid { grid-template-columns: 1fr; } }
+  .try-signals { display: flex; flex-direction: column; gap: 4px; }
+  .try-row { display: grid; grid-template-columns: 22px 1fr 5ch; gap: 10px; align-items: center; padding: 8px 8px 8px 0; border-radius: 4px; cursor: pointer; transition: background 0.12s; user-select: none; }
+  .try-row:hover { background: #1a1a1a; }
+  .try-row input { appearance: none; width: 16px; height: 16px; border: 1px solid var(--border-hot); border-radius: 3px; background: #0a0a0a; cursor: pointer; position: relative; margin: 0; }
+  .try-row input:checked { background: var(--accent-warm); border-color: var(--accent-warm); }
+  .try-row input:checked::after { content: "✓"; position: absolute; top: -2px; left: 2px; color: #fff; font-size: 12px; font-weight: 700; }
+  .try-row .sig-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; color: var(--text); }
+  .try-row .sig-w { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--text-faint); text-align: right; }
+  .try-row input:checked ~ .sig-w { color: var(--accent-warm); }
+  .gauge { background: #06060c; border: 1px solid var(--border); border-radius: 6px; padding: 22px 20px; text-align: center; position: sticky; top: 16px; }
+  .gauge .g-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 14px; }
+  .gauge .g-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 56px; font-weight: 700; line-height: 1; color: var(--accent); transition: color 0.25s; }
+  .gauge .g-num .g-denom { font-size: 22px; color: var(--text-faint); font-weight: 400; }
+  .gauge .g-verdict { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 12px; color: var(--accent); transition: color 0.25s; }
+  .gauge.tier-mid .g-num, .gauge.tier-mid .g-verdict { color: #d4b66a; }
+  .gauge.tier-hi .g-num, .gauge.tier-hi .g-verdict { color: var(--accent-warm); }
+  .gauge .g-bar { height: 6px; background: #0a0a0a; border-radius: 3px; margin-top: 16px; overflow: hidden; border: 1px solid var(--border); }
+  .gauge .g-bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), #d4b66a 50%, var(--accent-warm)); transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+  .gauge .g-hint { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: var(--text-faint); margin-top: 12px; line-height: 1.5; }
   .ui-body { padding: 22px; }
   .ui-row {
     display: grid;
@@ -149,78 +198,96 @@
 </header>
 
 <section>
-  <div class="section-label">Card-usage view, real output shape</div>
-  <p>The dashboard ranks each card by what percentage of the top-200 decks it appears in. Below is the UI layout — populated with the names and order from a typical meta snapshot. The percentages animate from zero to the snapshot values when the page would have hit the live API.</p>
-  <div class="ui-mock">
-    <div class="ui-bar">
-      <span class="tab active">/ card_usage</span>
-      <span class="tab">/ battle_replay</span>
-      <span class="tab" style="margin-left:auto;color:var(--text-faint);">top 200 · global · ladder</span>
+  <div class="section-label">All four views, one interactive mock</div>
+  <p>Click the tabs to switch views. The bot-check tab shows the <strong>real Matteo scan</strong> from my last match (score 20, unlikely bot). Other tabs use sample data with the layout and structure the live Flask app returns.</p>
+  <div class="ui-mock" id="mock">
+    <div class="ui-bar" id="mock-tabs">
+      <span class="tab active" data-view="bot">/ bot_check</span>
+      <span class="tab" data-view="opp">/ recent_opponents</span>
+      <span class="tab" data-view="syn">/ synergy</span>
+      <span class="tab" data-view="card">/ card_usage</span>
+      <span class="tab static" id="mock-context" style="margin-left:auto;color:var(--text-faint);">opponent: Matteo · live scan</span>
     </div>
     <div class="ui-body">
-      <div class="ui-row"><span class="name">Hog Rider</span><span class="bar"><div style="width:42%"></div></span><span class="pct">42%</span></div>
-      <div class="ui-row"><span class="name">The Log</span><span class="bar"><div style="width:38%"></div></span><span class="pct">38%</span></div>
-      <div class="ui-row"><span class="name">Skeleton Army</span><span class="bar"><div style="width:31%"></div></span><span class="pct">31%</span></div>
-      <div class="ui-row"><span class="name">Fireball</span><span class="bar"><div style="width:29%"></div></span><span class="pct">29%</span></div>
-      <div class="ui-row"><span class="name">Mega Knight</span><span class="bar"><div style="width:27%"></div></span><span class="pct">27%</span></div>
-      <div class="ui-row"><span class="name">Goblin Barrel</span><span class="bar"><div style="width:24%"></div></span><span class="pct">24%</span></div>
-      <div class="ui-row"><span class="name">Knight</span><span class="bar"><div style="width:23%"></div></span><span class="pct">23%</span></div>
-      <div class="ui-row"><span class="name">Musketeer</span><span class="bar"><div style="width:21%"></div></span><span class="pct">21%</span></div>
-    </div>
-    <div class="mock-note">// UI layout. Real percentages come from a live API pull and vary with the season. Live hosting needs a Supercell key + IP-whitelisted backend.</div>
-  </div>
-</section>
 
-<section>
-  <div class="section-label">Bot detector, real output</div>
-  <p>Pulls the opponent's profile and last 25 battles, runs ten transparent heuristics — clanless, auto-generated name, level/trophy mismatch, zero lifetime donations, no favourite card, fewer than 30 cards owned, no badge progress, ladder-only play, single-deck grind, 24/7 hours-of-day spread. Each signal carries a weight; the sum is the score. No ML, no opacity — every fired/clean state is shown so you can argue with the verdict.</p>
-  <div class="ui-mock">
-    <div class="ui-bar">
-      <span class="tab active">/ bot_check</span>
-      <span class="tab">/ recent_opponents</span>
-      <span class="tab">/ synergy</span>
-      <span class="tab" style="margin-left:auto;color:var(--text-faint);">live API output</span>
-    </div>
-    <div class="ui-body">
-      <div class="verdict-row">
-        <div class="who">Matteo <small>#VRPGYPPYP · lvl 38 · 8268 trophies</small></div>
-        <div class="score"><span class="num">20</span><span class="verdict-label">unlikely bot</span></div>
+      <div class="view show" data-view="bot">
+        <div class="verdict-row">
+          <div class="who">Matteo <small>#VRPGYPPYP · lvl 38 · 8268 trophies</small></div>
+          <div class="score"><span class="num">20</span><span class="verdict-label">unlikely bot</span></div>
+        </div>
+        <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">clanless</span><span class="sig-val">+10 · not in a clan</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">auto_generated_name</span><span class="sig-val">"Matteo" — real-name pattern</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">level_trophy_mismatch</span><span class="sig-val">level 38 ↔ 8268 trophies, internally consistent</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">zero_total_donations</span><span class="sig-val">17,412 lifetime donations</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_favourite_card</span><span class="sig-val">Valkyrie</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">few_cards_owned</span><span class="sig-val">40 cards</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_badge_progress</span><span class="sig-val">17 badges</span></div>
+        <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">ladder_only</span><span class="sig-val">+10 · all recent battles are PvP ladder</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">single_deck_grind</span><span class="sig-val">insufficient sample (battlelog has 2)</span></div>
+        <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">round_the_clock_play</span><span class="sig-val">insufficient sample (need ≥10 timestamped battles)</span></div>
       </div>
-      <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">clanless</span><span class="sig-val">+10 · not in a clan</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">auto_generated_name</span><span class="sig-val">"Matteo" — real-name pattern</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">level_trophy_mismatch</span><span class="sig-val">level 38 ↔ 8268 trophies, internally consistent</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">zero_total_donations</span><span class="sig-val">17,412 lifetime donations</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_favourite_card</span><span class="sig-val">Valkyrie</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">few_cards_owned</span><span class="sig-val">40 cards</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">no_badge_progress</span><span class="sig-val">17 badges</span></div>
-      <div class="sig-row"><span class="tag-fire">FIRED</span><span class="sig-name">ladder_only</span><span class="sig-val">+10 · all recent battles are PvP ladder</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">single_deck_grind</span><span class="sig-val">insufficient sample (battlelog has 2)</span></div>
-      <div class="sig-row"><span class="tag-clean">clean</span><span class="sig-name">round_the_clock_play</span><span class="sig-val">insufficient sample (need ≥10 timestamped battles)</span></div>
+
+      <div class="view" data-view="opp">
+        <div class="opp-row head"><span>tag</span><span>name</span><span class="num">lvl</span><span class="num">troph</span><span>verdict</span><span class="num">res</span></div>
+        <div class="opp-row"><span class="tag">#VRPGYPPYP</span><span class="name">Matteo</span><span class="num">38</span><span class="num">8268</span><span class="verdict-cell"><span class="vbar"><div class="v-low" style="width:20%"></div></span><span class="vscore">20</span></span><span class="res-win num">win</span></div>
+        <div class="opp-row sample"><span class="tag">#9P2Q8YYC</span><span class="name">noname2847</span><span class="num">12</span><span class="num">5012</span><span class="verdict-cell"><span class="vbar"><div class="v-hi" style="width:80%"></div></span><span class="vscore">80</span></span><span class="res-loss num">loss</span></div>
+        <div class="opp-row sample"><span class="tag">#YV0LR2GC</span><span class="name">8472</span><span class="num">9</span><span class="num">4988</span><span class="verdict-cell"><span class="vbar"><div class="v-hi" style="width:65%"></div></span><span class="vscore">65</span></span><span class="res-loss num">loss</span></div>
+        <div class="opp-row sample"><span class="tag">#L8Q2VRP0</span><span class="name">XxKingxX</span><span class="num">27</span><span class="num">6740</span><span class="verdict-cell"><span class="vbar"><div class="v-mid" style="width:35%"></div></span><span class="vscore">35</span></span><span class="res-win num">win</span></div>
+        <div class="opp-row sample"><span class="tag">#2QP9RY8L</span><span class="name">Alex</span><span class="num">42</span><span class="num">8104</span><span class="verdict-cell"><span class="vbar"><div class="v-low" style="width:15%"></div></span><span class="vscore">15</span></span><span class="res-win num">win</span></div>
+        <div class="opp-row sample"><span class="tag">#G8YR0LP2</span><span class="name">Sara</span><span class="num">51</span><span class="num">8412</span><span class="verdict-cell"><span class="vbar"><div class="v-low" style="width:10%"></div></span><span class="vscore">10</span></span><span class="res-loss num">loss</span></div>
+      </div>
+
+      <div class="view" data-view="syn">
+        <div class="syn-row"><span class="partner">Musketeer</span><span class="bar"><div style="width:78%"></div></span><span class="pct">78%</span></div>
+        <div class="syn-row"><span class="partner">Ice Spirit</span><span class="bar"><div style="width:71%"></div></span><span class="pct">71%</span></div>
+        <div class="syn-row"><span class="partner">Cannon</span><span class="bar"><div style="width:64%"></div></span><span class="pct">64%</span></div>
+        <div class="syn-row"><span class="partner">Skeletons</span><span class="bar"><div style="width:58%"></div></span><span class="pct">58%</span></div>
+        <div class="syn-row"><span class="partner">The Log</span><span class="bar"><div style="width:55%"></div></span><span class="pct">55%</span></div>
+        <div class="syn-row"><span class="partner">Fireball</span><span class="bar"><div style="width:49%"></div></span><span class="pct">49%</span></div>
+        <div class="syn-row"><span class="partner">Ice Golem</span><span class="bar"><div style="width:41%"></div></span><span class="pct">41%</span></div>
+      </div>
+
+      <div class="view" data-view="card">
+        <div class="ui-row"><span class="name">Hog Rider</span><span class="bar"><div style="width:42%"></div></span><span class="pct">42%</span></div>
+        <div class="ui-row"><span class="name">The Log</span><span class="bar"><div style="width:38%"></div></span><span class="pct">38%</span></div>
+        <div class="ui-row"><span class="name">Skeleton Army</span><span class="bar"><div style="width:31%"></div></span><span class="pct">31%</span></div>
+        <div class="ui-row"><span class="name">Fireball</span><span class="bar"><div style="width:29%"></div></span><span class="pct">29%</span></div>
+        <div class="ui-row"><span class="name">Mega Knight</span><span class="bar"><div style="width:27%"></div></span><span class="pct">27%</span></div>
+        <div class="ui-row"><span class="name">Goblin Barrel</span><span class="bar"><div style="width:24%"></div></span><span class="pct">24%</span></div>
+        <div class="ui-row"><span class="name">Knight</span><span class="bar"><div style="width:23%"></div></span><span class="pct">23%</span></div>
+        <div class="ui-row"><span class="name">Musketeer</span><span class="bar"><div style="width:21%"></div></span><span class="pct">21%</span></div>
+      </div>
+
     </div>
-    <div class="mock-note">// Real scan against an actual opponent from my last match. Score 0-24 = unlikely bot, 25-49 = suspicious, 50-74 = likely, 75+ = very likely.</div>
+    <div class="mock-note" id="mock-note">// Real scan against an actual opponent from my last match. Score 0-24 = unlikely bot, 25-49 = suspicious, 50-74 = likely, 75+ = very likely.</div>
   </div>
 </section>
 
 <section>
-  <div class="section-label">Card synergy view</div>
-  <p>For any card, pulls every top-200 deck containing it and ranks the seven cards it co-occurs with most often. Surfaces archetypes from the live meta without hardcoding a single "this is a cycle deck" rule. The bars below show the partners pulled alongside Hog Rider in a recent snapshot.</p>
-  <div class="ui-mock">
-    <div class="ui-bar">
-      <span class="tab">/ bot_check</span>
-      <span class="tab">/ recent_opponents</span>
-      <span class="tab active">/ synergy</span>
-      <span class="tab" style="margin-left:auto;color:var(--text-faint);">card: Hog Rider · top 200 · global</span>
+  <div class="section-label">Try it · score a hypothetical opponent</div>
+  <p>Toggle the signals you observe. The score and verdict recompute live with the same weights the Python detector uses. Useful for arguing with the verdict before pointing the real scanner at someone.</p>
+  <div class="try-it">
+    <div class="try-grid">
+      <div class="try-signals" id="try-signals">
+        <label class="try-row"><input type="checkbox" data-w="10"><span class="sig-label">clanless</span><span class="sig-w">+10</span></label>
+        <label class="try-row"><input type="checkbox" data-w="15"><span class="sig-label">auto_generated_name</span><span class="sig-w">+15</span></label>
+        <label class="try-row"><input type="checkbox" data-w="15"><span class="sig-label">level_trophy_mismatch</span><span class="sig-w">+15</span></label>
+        <label class="try-row"><input type="checkbox" data-w="10"><span class="sig-label">zero_total_donations</span><span class="sig-w">+10</span></label>
+        <label class="try-row"><input type="checkbox" data-w="5"><span class="sig-label">no_favourite_card</span><span class="sig-w">+5</span></label>
+        <label class="try-row"><input type="checkbox" data-w="10"><span class="sig-label">few_cards_owned</span><span class="sig-w">+10</span></label>
+        <label class="try-row"><input type="checkbox" data-w="5"><span class="sig-label">no_badge_progress</span><span class="sig-w">+5</span></label>
+        <label class="try-row"><input type="checkbox" data-w="10"><span class="sig-label">ladder_only</span><span class="sig-w">+10</span></label>
+        <label class="try-row"><input type="checkbox" data-w="15"><span class="sig-label">single_deck_grind</span><span class="sig-w">+15</span></label>
+        <label class="try-row"><input type="checkbox" data-w="15"><span class="sig-label">round_the_clock_play</span><span class="sig-w">+15</span></label>
+      </div>
+      <div class="gauge" id="gauge">
+        <div class="g-label">bot score</div>
+        <div class="g-num"><span id="g-num">0</span><span class="g-denom">/100</span></div>
+        <div class="g-verdict" id="g-verdict">unlikely bot</div>
+        <div class="g-bar"><div id="g-bar" style="width:0%"></div></div>
+        <div class="g-hint">0-24 unlikely · 25-49 suspicious<br>50-74 likely · 75+ very likely</div>
+      </div>
     </div>
-    <div class="ui-body">
-      <div class="syn-row"><span class="partner">Musketeer</span><span class="bar"><div style="width:78%"></div></span><span class="pct">78%</span></div>
-      <div class="syn-row"><span class="partner">Ice Spirit</span><span class="bar"><div style="width:71%"></div></span><span class="pct">71%</span></div>
-      <div class="syn-row"><span class="partner">Cannon</span><span class="bar"><div style="width:64%"></div></span><span class="pct">64%</span></div>
-      <div class="syn-row"><span class="partner">Skeletons</span><span class="bar"><div style="width:58%"></div></span><span class="pct">58%</span></div>
-      <div class="syn-row"><span class="partner">The Log</span><span class="bar"><div style="width:55%"></div></span><span class="pct">55%</span></div>
-      <div class="syn-row"><span class="partner">Fireball</span><span class="bar"><div style="width:49%"></div></span><span class="pct">49%</span></div>
-      <div class="syn-row"><span class="partner">Ice Golem</span><span class="bar"><div style="width:41%"></div></span><span class="pct">41%</span></div>
-    </div>
-    <div class="mock-note">// UI layout. Real co-occurrence rates come from a live top-200 sweep and shift between seasons.</div>
   </div>
 </section>
 
@@ -348,5 +415,48 @@ flask --app app run --debug
 </footer>
 
 </div>
+
+<script>
+  (function () {
+    const tabs = document.querySelectorAll('#mock-tabs .tab[data-view]');
+    const views = document.querySelectorAll('#mock .view');
+    const note = document.getElementById('mock-note');
+    const ctx = document.getElementById('mock-context');
+    const contexts = {
+      bot:  { ctx: 'opponent: Matteo · live scan',                 note: '// Real scan against an actual opponent from my last match. Score 0-24 = unlikely bot, 25-49 = suspicious, 50-74 = likely, 75+ = very likely.' },
+      opp:  { ctx: 'sweep of last 25 battles · sorted by suspicion', note: '// First row is real (Matteo). Others are sample data showing layout. Sample rows would be replaced by live scan output.' },
+      syn:  { ctx: 'card: Hog Rider · top 200 · global',           note: '// UI layout. Real co-occurrence rates come from a live top-200 sweep and shift between seasons.' },
+      card: { ctx: 'top 200 · global · ladder',                    note: '// UI layout. Real percentages come from a live API pull and vary with the season.' },
+    };
+    tabs.forEach(t => t.addEventListener('click', () => {
+      const v = t.dataset.view;
+      tabs.forEach(x => x.classList.toggle('active', x === t));
+      views.forEach(x => x.classList.toggle('show', x.dataset.view === v));
+      if (contexts[v]) { ctx.textContent = contexts[v].ctx; note.textContent = contexts[v].note; }
+    }));
+
+    const inputs = document.querySelectorAll('#try-signals input');
+    const gNum = document.getElementById('g-num');
+    const gVerdict = document.getElementById('g-verdict');
+    const gBar = document.getElementById('g-bar');
+    const gauge = document.getElementById('gauge');
+    function recalc() {
+      let s = 0;
+      inputs.forEach(i => { if (i.checked) s += parseInt(i.dataset.w, 10); });
+      if (s > 100) s = 100;
+      gNum.textContent = s;
+      gBar.style.width = s + '%';
+      let v, tier;
+      if (s >= 75)      { v = 'very likely bot'; tier = 'tier-hi'; }
+      else if (s >= 50) { v = 'likely bot';       tier = 'tier-hi'; }
+      else if (s >= 25) { v = 'suspicious';       tier = 'tier-mid'; }
+      else              { v = 'unlikely bot';     tier = ''; }
+      gVerdict.textContent = v;
+      gauge.className = 'gauge ' + tier;
+    }
+    inputs.forEach(i => i.addEventListener('change', recalc));
+    recalc();
+  })();
+</script>
 </body>
 </html>
