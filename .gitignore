@@ -3,4 +3,5 @@ __pycache__/
 .env
 mykey.txt
 venv/
+.venv/
 .DS_Store
